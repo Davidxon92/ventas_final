@@ -409,7 +409,7 @@
 const _isLocalhost = ['localhost','127.0.0.1'].includes(window.location.hostname);
 let API_BASE  = _isLocalhost ? (localStorage.getItem('ferresmart_api')   || '') : '';
 let API_TOKEN = _isLocalhost ? (localStorage.getItem('ferresmart_token') || '') : '';
-document.getElementById('apiUrl').value = API_BASE;
+const _apiUrlEl = document.getElementById('apiUrl'); if (_apiUrlEl) _apiUrlEl.value = API_BASE;
 
 let ventasList=[], clientesList=[], productosList=[];
 let hashTable={}, pilaVentas=[];
@@ -680,8 +680,8 @@ function exportarCSV(){
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h.join(','),...r].join('\n')],{type:'text/csv'}));a.download='ventas_ferresmart.csv';a.click();showToast('CSV exportado ✓');
 }
 
-function guardarConfig(){API_BASE=document.getElementById('apiUrl').value.trim();API_TOKEN=document.getElementById('apiToken').value.trim();localStorage.setItem('ferresmart_api',API_BASE);localStorage.setItem('ferresmart_token',API_TOKEN);showToast('Configuración guardada');}
-async function testConexion(){const res=document.getElementById('config-result');res.textContent='Probando...';try{await apiFetch('/api/analisis/resumen');res.style.color='var(--accent2)';res.textContent='✓ Conexión exitosa con '+API_BASE;setApiStatus('ok','Conectado');}catch(e){res.style.color='var(--accent3)';res.textContent='✗ No se pudo conectar: '+e.message;setApiStatus('err','Sin conexión');}}
+function guardarConfig(){API_BASE=(document.getElementById('apiUrl')||{value:''}).value.trim();API_TOKEN=(document.getElementById('apiToken')||{value:''}).value.trim();localStorage.setItem('ferresmart_api',API_BASE);localStorage.setItem('ferresmart_token',API_TOKEN);showToast('Configuración guardada');}
+async function testConexion(){const res=document.getElementById('config-result');if(!res)return;res.textContent='Probando...';try{await apiFetch('/api/analisis/resumen');res.style.color='var(--accent2)';res.textContent='✓ Conexión exitosa con '+API_BASE;setApiStatus('ok','Conectado');}catch(e){res.style.color='var(--accent3)';res.textContent='✗ No se pudo conectar: '+e.message;setApiStatus('err','Sin conexión');}}
 
 function openModal(t){if(t==='venta')poblarSelectsVenta();document.getElementById('modal-'+t).classList.add('open');}
 function closeModal(t){document.getElementById('modal-'+t).classList.remove('open');}
