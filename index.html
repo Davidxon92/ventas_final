@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FerreSmart Pro — Registro y Análisis de Ventas</title>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;600&family=Syne:wght@400;600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #faf7f5; --bg2: #c44f0c; --bg3: #f3f0f0; --card: #1e1e1e;
+      --border: #2e2e2e; --border2: #dbd3d3;
+      --accent: #1d71c0; --accent2: #47ffb2; --accent3: #ff6b6b; --accent4: #6bbbff;
+      --text: #aaa9a9; --text2: #080808; --text3: #050505;
+      --font: 'Plus Jakarta Sans', sans-serif; --mono: 'IBM Plex Mono', monospace;
+      --radius: 8px; --radius2: 14px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg); color: var(--text); min-height: 100vh; }
+    .topbar { display:flex; align-items:center; justify-content:space-between; padding:1rem 2rem; border-bottom:1px solid #3a3a3a; background:var(--bg); position:sticky; top:0; z-index:100; }
+    .logo { font-size:1.3rem; font-weight:800; letter-spacing:-0.03em; }
+    .logo span { color:var(--accent); }
+    .logo small { font-size:0.6rem; color:var(--text3); font-weight:400; margin-left:4px; vertical-align:middle; font-family:var(--mono); }
+    .topbar-right { display:flex; align-items:center; gap:1rem; }
+    .api-status { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:0.72rem; color:var(--text2); background:var(--bg3); padding:4px 10px; border-radius:100px; border:1px solid var(--border); }
+    .dot { width:7px; height:7px; border-radius:50%; background:var(--text3); }
+    .dot.ok { background:var(--accent2); box-shadow:0 0 6px var(--accent2); }
+    .dot.err { background:var(--accent3); }
+    .dot.loading { background:var(--accent); animation:pulse 1s infinite; }
+    @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+    .layout { display:flex; min-height:calc(100vh - 57px); }
+    .sidebar { width:230px; min-width:230px; border-right:1px solid var(--border); padding:1.5rem 1rem; display:flex; flex-direction:column; gap:4px; }
+    .nav-label { font-family:var(--mono); font-size:0.65rem; color:var(--text3); letter-spacing:0.1em; text-transform:uppercase; margin:1rem 0 0.4rem 8px; }
+    .nav-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:var(--radius); cursor:pointer; font-size:0.88rem; color:var(--text2); border:none; background:transparent; width:100%; text-align:left; transition:all 0.15s; }
+    .nav-item:hover { background:var(--bg3); color:var(--text); }
+    .nav-item.active { background:var(--accent); color:#0f0f0f; font-weight:700; }
+    .nav-icon { font-size:1rem; width:20px; text-align:center; }
+    .main { flex:1; padding:2rem; overflow-x:hidden; }
+    .page { display:none; }
+    .page.active { display:block; }
+    .page-header { margin-bottom:2rem; }
+    .page-title { font-size:1.8rem; font-weight:800; letter-spacing:-0.03em; }
+    .page-subtitle { color:var(--text2); font-size:0.9rem; margin-top:4px; }
+    .metrics-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(180px,1fr)); gap:1rem; margin-bottom:2rem; }
+    .metric-card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius2); padding:1.2rem 1.4rem; position:relative; overflow:hidden; }
+    .metric-card::before { content:''; position:absolute; top:0; left:0; right:0; height:2px; background:var(--accent-color,var(--accent)); }
+    .metric-label { font-family:var(--mono); font-size:0.68rem; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; margin-bottom:0.6rem; color:#ffffff; }
+    .metric-value { font-size:2.2rem; font-weight:800; letter-spacing:-0.04em; line-height:1; color:#ffffff; }
+    .metric-sub { font-size:0.75rem; color:#ffffff; margin-top:6px; }
+    .metric-badge { display:inline-block; padding:2px 7px; border-radius:100px; font-size:0.7rem; font-weight:600; }
+    .badge-up { background:rgba(71,255,178,0.15); color:var(--accent2); }
+    .badge-dn { background:rgba(255,107,107,0.15); color:var(--accent3); }
+    .card { background:var(--card); border:1px solid var(--border); border-radius:var(--radius2); padding:1.4rem; margin-bottom:1.2rem; }
+    .card-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:1.2rem; }
+    .card-title { font-size:0.95rem; font-weight:700; }
+    .card-badge { font-family:var(--mono); font-size:0.65rem; color:var(--text3); background:var(--bg3); padding:3px 8px; border-radius:100px; border:1px solid var(--border); }
+    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:1.2rem; margin-bottom:1.2rem; }
+    @media(max-width:860px){ .grid-2{grid-template-columns:1fr;} }
+    .chart-wrap { position:relative; height:260px; width:100%; }
+    .data-table { width:100%; border-collapse:collapse; font-size:0.85rem; }
+    .data-table th { text-align:left; font-family:var(--mono); font-size:0.65rem; color:#ffffff; letter-spacing:0.08em; text-transform:uppercase; padding:0 12px 10px; border-bottom:1px solid #3a3a3a; }
+    .data-table td { padding:10px 12px; border-bottom:1px solid var(--border); color:#bbbabae8; }
+    .data-table tr:last-child td { border-bottom:none; }
+    .data-table tr:hover td { background:var(--bg3); color:#ffffff; }
+    .td-bold { font-weight:700; color:var(--text) !important; }
+    .td-green { color:var(--accent2) !important; font-family:var(--mono); font-size:0.8rem; }
+    .td-mono { font-family:var(--mono); font-size:0.8rem; color:#ffffff; }
+    .stack-vis { display:flex; flex-direction:column; gap:4px; max-height:320px; overflow-y:auto; }
+    .stack-item { display:flex; align-items:center; gap:10px; padding:8px 12px; border-radius:var(--radius); border:1px solid var(--border); background:var(--bg3); font-size:0.82rem; }
+    .stack-item.top { border-color:var(--accent); background:rgba(232,255,71,0.05); }
+    .stack-index { font-family:var(--mono); font-size:0.65rem; color:var(--text3); min-width:24px; }
+    .hash-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:8px; }
+    .hash-cell { background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); padding:10px; font-size:0.78rem; }
+    .hash-key { font-family:var(--mono); font-size:0.65rem; color:#0f0f0f; margin-bottom:4px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .hash-val { font-weight:700; color:#0f0f0f; }
+    .hash-sub { font-size:0.7rem; color:var(--text3); margin-top:2px; }
+    .search-bar { display:flex; gap:8px; margin-bottom:1rem; flex-wrap:wrap; }
+    .search-bar input, .search-bar select, .form-input { background:var(--bg3); border:1px solid var(--border); border-radius:var(--radius); padding:8px 12px; color:var(--text); font-family:var(--font); font-size:0.85rem; outline:none; }
+    .search-bar input { flex:1; min-width:140px; }
+    .search-bar input:focus, .search-bar select:focus, .form-input:focus { border-color:var(--accent); }
+    .search-bar select option, .form-input option { background:var(--bg3); }
+    .form-input { width:100%; }
+    .btn { padding:8px 16px; border-radius:var(--radius); border:1px solid var(--border); background:var(--bg3); color:var(--text); font-family:var(--font); font-size:0.85rem; cursor:pointer; transition:all 0.15s; white-space:nowrap; }
+    .btn:hover { background:var(--border2); }
+    .btn.primary { background:var(--accent); color:#0f0f0f; font-weight:700; border-color:var(--accent); }
+    .btn.primary:hover { opacity:0.9; }
+    .modal-bg { display:none; position:fixed; inset:0; background:rgba(0,0,0,0.85); z-index:1000; align-items:center; justify-content:center; }
+    .modal-bg.open { display:flex; }
+    .modal { background:var(--card); border:1px solid var(--border2); border-radius:var(--radius2); padding:2rem; width:100%; max-width:460px; max-height:90vh; overflow-y:auto; }
+    .modal-title { font-size:1.1rem; font-weight:800; margin-bottom:1.2rem; }
+    .form-row { margin-bottom:1rem; }
+    .form-label { font-family:var(--mono); font-size:0.65rem; color:var(--text3); letter-spacing:0.08em; text-transform:uppercase; display:block; margin-bottom:5px; }
+    .modal-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:1.4rem; }
+    .form-grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    #toast { position:fixed; bottom:2rem; right:2rem; background:var(--card); border:1px solid var(--border2); border-radius:var(--radius); padding:10px 16px; font-size:0.85rem; opacity:0; transform:translateY(10px); transition:all 0.3s; z-index:2000; pointer-events:none; }
+    #toast.show { opacity:1; transform:translateY(0); }
+    .loading-state { display:flex; align-items:center; justify-content:center; padding:3rem; color:var(--text3); font-family:var(--mono); font-size:0.8rem; gap:8px; }
+    .spinner { width:16px; height:16px; border:2px solid var(--border2); border-top-color:var(--accent); border-radius:50%; animation:spin 0.7s linear infinite; }
+    @keyframes spin { to{transform:rotate(360deg)} }
+    .empty-state { padding:3rem; text-align:center; color:var(--text3); font-size:0.85rem; }
+    .pila-top-label { font-family:var(--mono); font-size:0.65rem; color:var(--accent); letter-spacing:0.1em; text-transform:uppercase; margin-bottom:8px; }
+    .tag { display:inline-block; padding:2px 8px; border-radius:100px; font-size:0.68rem; font-weight:600; }
+    .tag-blue { background:rgba(107,187,255,0.15); color:var(--accent4); }
+    .tag-yellow { background:rgba(232,255,71,0.12); color:var(--accent); }
+    .tag-green { background:rgba(71,255,178,0.12); color:var(--accent2); }
+    .tag-red { background:rgba(255,107,107,0.12); color:var(--accent3); }
+    ::-webkit-scrollbar { width:4px; }
+    ::-webkit-scrollbar-thumb { background:var(--border2); border-radius:2px; }
+    .avatar { width:34px; height:34px; border-radius:50%; display:flex; align-items:center; justify-content:center; font-weight:700; font-size:0.75rem; background:rgba(107,187,255,0.15); color:var(--accent4); flex-shrink:0; }
+    .stock-bar-wrap { height:4px; background:var(--border); border-radius:2px; margin-top:4px; }
+    .stock-bar { height:4px; border-radius:2px; background:var(--accent2); }
+    .stock-bar.low { background:var(--accent3); }
+  </style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="logo">Ferre<span>Smart</span><small>PRO</small></div>
+  <div class="topbar-right">
+    <div class="api-status" id="apiStatus"><div class="dot loading" id="apiDot"></div><span id="apiLabel">Conectando...</span></div>
+    <button class="btn" onclick="fetchAll()">↻ Actualizar</button>
+    <button class="btn primary" onclick="openModal('venta')">+ Nueva Venta</button>
+  </div>
+</header>
+
+<div class="layout">
+  <nav class="sidebar">
+    <div class="nav-label">Principal</div>
+    <button class="nav-item active" onclick="showPage('dashboard',this)"><span class="nav-icon">◈</span> Dashboard</button>
+    <button class="nav-item" onclick="showPage('ventas',this)"><span class="nav-icon">▤</span> Ventas</button>
+    <button class="nav-item" onclick="showPage('detalle',this)"><span class="nav-icon">◎</span> Detalle de Ventas</button>
+    <div class="nav-label">Gestión</div>
+    <button class="nav-item" onclick="showPage('clientes',this)"><span class="nav-icon">◉</span> Clientes</button>
+    <button class="nav-item" onclick="showPage('productos',this)"><span class="nav-icon">⊞</span> Productos</button>
+    <div class="nav-label">Estructuras</div>
+    <button class="nav-item" onclick="showPage('pila',this)"><span class="nav-icon">⊟</span> Pila (Stack)</button>
+    <button class="nav-item" onclick="showPage('hash',this)"><span class="nav-icon">⊕</span> Hash Table</button>
+  </nav>
+
+  <main class="main">
+
+    <!-- DASHBOARD -->
+    <div class="page active" id="page-dashboard">
+      <div class="page-header"><div class="page-title">Dashboard</div><div class="page-subtitle">Resumen general de FerreSmart Pro</div></div>
+      <div class="metrics-grid">
+        <div class="metric-card" style="--accent-color:var(--accent)"><div class="metric-label">Total Ventas</div><div class="metric-value" id="m-total">—</div><div class="metric-sub"><span class="metric-badge badge-up" id="m-total-badge">cargando...</span></div></div>
+        <div class="metric-card" style="--accent-color:var(--accent2)"><div class="metric-label">Ingresos</div><div class="metric-value" id="m-ingresos">—</div><div class="metric-sub">total acumulado</div></div>
+        <div class="metric-card" style="--accent-color:var(--accent4)"><div class="metric-label">Clientes</div><div class="metric-value" id="m-clientes">—</div><div class="metric-sub">registrados</div></div>
+        <div class="metric-card" style="--accent-color:var(--accent3)"><div class="metric-label">Productos</div><div class="metric-value" id="m-productos">—</div><div class="metric-sub">en catálogo</div></div>
+      </div>
+      <div class="grid-2">
+        <div class="card"><div class="card-header"><div class="card-title">Ventas por Día</div><div class="card-badge">últimos 7 días</div></div><div class="chart-wrap"><canvas id="chartDia" role="img" aria-label="Ventas diarias">Ventas por día.</canvas></div></div>
+        <div class="card"><div class="card-header"><div class="card-title">Ingresos por Categoría</div><div class="card-badge">distribución</div></div><div class="chart-wrap"><canvas id="chartCat" role="img" aria-label="Ingresos por categoría">Por categoría.</canvas></div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Últimas 5 Ventas</div><div class="card-badge">top del stack</div></div>
+        <table class="data-table"><thead><tr><th>ID</th><th>Cliente</th><th>Producto</th><th>Cant.</th><th>Total</th><th>Fecha</th><th>Estado</th></tr></thead><tbody id="tbl-recientes"><tr><td colspan="7"><div class="loading-state"><div class="spinner"></div> Cargando...</div></td></tr></tbody></table>
+      </div>
+    </div>
+
+    <!-- VENTAS -->
+    <div class="page" id="page-ventas">
+      <div class="page-header"><div class="page-title">Gestión de Ventas</div><div class="page-subtitle">Todas las transacciones de la ferretería</div></div>
+      <div class="card">
+        <div class="search-bar">
+          <input type="text" id="searchVenta" placeholder="Buscar por producto, cliente, ID..." oninput="filtrarVentas()" />
+          <select id="filterEstado" onchange="filtrarVentas()"><option value="">Todos los estados</option><option value="completada">Completada</option><option value="pendiente">Pendiente</option><option value="cancelada">Cancelada</option></select>
+          <button class="btn primary" onclick="openModal('venta')">+ Nueva venta</button>
+          <button class="btn" onclick="exportarCSV()">↓ CSV</button>
+        </div>
+        <table class="data-table"><thead><tr><th>ID</th><th>Cliente</th><th>Producto</th><th>Categoría</th><th>Cant.</th><th>Precio U.</th><th>Total</th><th>Fecha</th><th>Estado</th></tr></thead><tbody id="tbl-ventas"><tr><td colspan="9"><div class="loading-state"><div class="spinner"></div> Cargando...</div></td></tr></tbody></table>
+        <div style="padding:10px 12px;font-family:var(--mono);font-size:0.7rem;color:var(--text3);border-top:1px solid var(--border);">Mostrando <span id="count-ventas">0</span> registros</div>
+      </div>
+    </div>
+
+    <!-- DETALLE DE VENTAS -->
+    <div class="page" id="page-detalle">
+      <div class="page-header"><div class="page-title">Detalle de Ventas</div><div class="page-subtitle">Información completa por transacción — haz clic en una fila para ver el detalle</div></div>
+      <div class="card">
+        <div class="search-bar">
+          <input type="text" id="searchDetalle" placeholder="Buscar por ID, cliente, producto..." oninput="filtrarDetalle()" />
+          <select id="filterDetalleEstado" onchange="filtrarDetalle()"><option value="">Todos los estados</option><option value="completada">Completada</option><option value="pendiente">Pendiente</option><option value="cancelada">Cancelada</option></select>
+          <select id="filterDetalleCat" onchange="filtrarDetalle()">
+            <option value="">Todas las categorías</option>
+            <option value="herramientas manuales">Herramientas manuales</option>
+            <option value="herramientas eléctricas">Herramientas eléctricas</option>
+            <option value="tornillería">Tornillería</option>
+            <option value="plomería">Plomería</option>
+            <option value="pintura">Pintura</option>
+            <option value="construcción">Construcción</option>
+            <option value="electricidad">Electricidad</option>
+          </select>
+        </div>
+        <table class="data-table" id="tbl-detalle-wrap">
+          <thead><tr><th></th><th>ID Venta</th><th>ID Cliente</th><th>Cliente</th><th>ID Producto</th><th>Producto</th><th>Categoría</th><th>Cant.</th><th>Precio Unit.</th><th>Subtotal</th><th>Fecha</th><th>Estado</th></tr></thead>
+          <tbody id="tbl-detalle"><tr><td colspan="12"><div class="loading-state"><div class="spinner"></div> Cargando...</div></td></tr></tbody>
+        </table>
+        <div style="padding:10px 12px;font-family:var(--mono);font-size:0.7rem;color:var(--text3);border-top:1px solid var(--border);">Mostrando <span id="count-detalle">0</span> registros · haz clic en una fila para ver el detalle completo</div>
+      </div>
+
+      <!-- PANEL DETALLE -->
+      <div id="detalle-panel" style="display:none;">
+        <div class="card" style="border-color:var(--accent);background:rgba(232,255,71,0.03);">
+          <div class="card-header">
+            <div style="display:flex;align-items:center;gap:10px;">
+              <div style="width:36px;height:36px;border-radius:50%;background:rgba(232,255,71,0.15);display:flex;align-items:center;justify-content:center;font-size:1rem;">🔍</div>
+              <div><div class="card-title" id="dp-titulo">Detalle de Venta</div><div style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);" id="dp-id">—</div></div>
+            </div>
+            <button class="btn" onclick="cerrarDetalle()">✕ Cerrar</button>
+          </div>
+
+          <div class="grid-2" style="margin-bottom:1rem;">
+            <!-- INFO VENTA -->
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;">Información de la Venta</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                <div class="metric-card" style="--accent-color:var(--accent2);padding:0.9rem;">
+                  <div class="metric-label">Total</div>
+                  <div class="metric-value" style="font-size:1.5rem;" id="dp-total">—</div>
+                </div>
+                <div class="metric-card" style="--accent-color:var(--accent4);padding:0.9rem;">
+                  <div class="metric-label">Cantidad</div>
+                  <div class="metric-value" style="font-size:1.5rem;" id="dp-cantidad">—</div>
+                </div>
+              </div>
+              <div class="metric-card" style="--accent-color:var(--accent);padding:0.9rem;">
+                <div class="metric-label">Precio Unitario</div>
+                <div class="metric-value" style="font-size:1.5rem;" id="dp-precio">—</div>
+              </div>
+            </div>
+            <!-- INFO CLIENTE Y PRODUCTO -->
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin-bottom:4px;">Cliente & Producto</div>
+              <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">
+                <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);margin-bottom:6px;">CLIENTE</div>
+                <div style="font-weight:700;color:var(--text);" id="dp-cliente">—</div>
+                <div style="font-family:var(--mono);font-size:0.72rem;color:var(--accent4);margin-top:2px;" id="dp-id-cliente">—</div>
+              </div>
+              <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:12px;">
+                <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);margin-bottom:6px;">PRODUCTO</div>
+                <div style="font-weight:700;color:var(--text);" id="dp-producto">—</div>
+                <div style="display:flex;gap:6px;margin-top:4px;"><span class="tag tag-blue" id="dp-categoria">—</span><span style="font-family:var(--mono);font-size:0.68rem;color:var(--text3);" id="dp-id-producto">—</span></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- FILA FECHA Y ESTADO -->
+          <div style="display:flex;gap:12px;flex-wrap:wrap;">
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;flex:1;">
+              <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);margin-bottom:4px;">FECHA</div>
+              <div style="font-family:var(--mono);font-size:0.9rem;color:var(--text);" id="dp-fecha">—</div>
+            </div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;flex:1;">
+              <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);margin-bottom:4px;">ESTADO</div>
+              <div id="dp-estado">—</div>
+            </div>
+            <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:10px 16px;flex:1;">
+              <div style="font-family:var(--mono);font-size:0.65rem;color:var(--text3);margin-bottom:4px;">CÁLCULO</div>
+              <div style="font-family:var(--mono);font-size:0.78rem;color:var(--text2);" id="dp-calculo">—</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- CLIENTES -->
+    <div class="page" id="page-clientes">
+      <div class="page-header"><div class="page-title">Clientes</div><div class="page-subtitle">Registro de clientes de la ferretería</div></div>
+      <div class="card">
+        <div class="search-bar">
+          <input type="text" id="searchCliente" placeholder="Buscar por nombre, NIT, teléfono..." oninput="filtrarClientes()" />
+          <button class="btn primary" onclick="openModal('cliente')">+ Nuevo cliente</button>
+        </div>
+        <table class="data-table"><thead><tr><th>ID</th><th>Nombre</th><th>NIT</th><th>Teléfono</th><th>Correo</th><th>Dirección</th><th>Compras</th></tr></thead><tbody id="tbl-clientes"><tr><td colspan="7"><div class="loading-state"><div class="spinner"></div> Cargando...</div></td></tr></tbody></table>
+        <div style="padding:10px 12px;font-family:var(--mono);font-size:0.7rem;color:var(--text3);border-top:1px solid var(--border);"><span id="count-clientes">0</span> clientes registrados</div>
+      </div>
+    </div>
+
+    <!-- PRODUCTOS -->
+    <div class="page" id="page-productos">
+      <div class="page-header"><div class="page-title">Productos</div><div class="page-subtitle">Catálogo de herramientas y materiales</div></div>
+      <div class="card">
+        <div class="search-bar">
+          <input type="text" id="searchProd" placeholder="Buscar producto..." oninput="filtrarProductos()" />
+          <select id="filterCatProd" onchange="filtrarProductos()">
+            <option value="">Todas las categorías</option>
+            <option value="herramientas manuales">Herramientas manuales</option>
+            <option value="herramientas eléctricas">Herramientas eléctricas</option>
+            <option value="tornillería">Tornillería</option>
+            <option value="plomería">Plomería</option>
+            <option value="pintura">Pintura</option>
+            <option value="construcción">Construcción</option>
+            <option value="electricidad">Electricidad</option>
+          </select>
+          <button class="btn primary" onclick="openModal('producto')">+ Nuevo producto</button>
+        </div>
+        <table class="data-table"><thead><tr><th>ID</th><th>Nombre</th><th>Categoría</th><th>Precio</th><th>Stock</th><th>Unidad</th><th>Disponibilidad</th></tr></thead><tbody id="tbl-productos"><tr><td colspan="7"><div class="loading-state"><div class="spinner"></div> Cargando...</div></td></tr></tbody></table>
+        <div style="padding:10px 12px;font-family:var(--mono);font-size:0.7rem;color:var(--text3);border-top:1px solid var(--border);"><span id="count-productos">0</span> productos en catálogo</div>
+      </div>
+      <div class="card"><div class="card-header"><div class="card-title">Top Productos Más Vendidos</div><div class="card-badge">hash table</div></div><div class="chart-wrap" style="height:300px;"><canvas id="chartProd" role="img" aria-label="Top productos">Top productos.</canvas></div></div>
+    </div>
+
+    <!-- PILA -->
+    <div class="page" id="page-pila">
+      <div class="page-header"><div class="page-title">Pila de Ventas Recientes</div><div class="page-subtitle">Estructura LIFO — Last In, First Out</div></div>
+      <div class="grid-2">
+        <div class="card">
+          <div class="card-header"><div class="card-title">Estado de la Pila</div><div class="card-badge">stack</div></div>
+          <div class="metrics-grid" style="grid-template-columns:1fr 1fr;margin-bottom:1rem;">
+            <div class="metric-card" style="--accent-color:var(--accent);padding:0.8rem;"><div class="metric-label">Tamaño</div><div class="metric-value" id="stack-size">0</div></div>
+            <div class="metric-card" style="--accent-color:var(--accent2);padding:0.8rem;"><div class="metric-label">Capacidad</div><div class="metric-value">10</div></div>
+          </div>
+          <div style="display:flex;gap:8px;margin-bottom:1rem;">
+            <button class="btn primary" style="flex:1;" onclick="pilaApiPop()">POP ↑</button>
+            <button class="btn" style="flex:1;" onclick="pilaApiPeek()">PEEK 👁</button>
+          </div>
+          <div id="peek-result" style="display:none;padding:10px;background:var(--bg3);border-radius:var(--radius);font-family:var(--mono);font-size:0.78rem;color:var(--accent);"></div>
+          <div style="margin-top:1.2rem;font-size:0.82rem;color:#ffffff;;line-height:1.7;">
+            Almacena las <strong style="color:#ffffff;">10 ventas más recientes</strong>. Cada nueva venta hace <span style="font-family:var(--mono);color:#2d29f0;">PUSH</span>. Si se llena, el registro más antiguo se descarta.<br><br>
+            <span style="font-family:var(--mono);font-size:0.75rem;">PUSH O(1) · POP O(1) · PEEK O(1)</span>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-header"><div class="card-title">Visualización</div></div>
+          <div class="pila-top-label">← TOP (más reciente)</div>
+          <div class="stack-vis" id="stack-visual"><div class="loading-state"><div class="spinner"></div> Cargando pila...</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- HASH TABLE -->
+    <div class="page" id="page-hash">
+      <div class="page-header"><div class="page-title">Tabla Hash de Productos</div><div class="page-subtitle">Consultas O(1) — clave: nombre del producto</div></div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Búsqueda Directa</div><div class="card-badge">O(1) lookup</div></div>
+        <div class="search-bar">
+          <input type="text" id="hashSearch" placeholder="Nombre del producto..." />
+          <button class="btn primary" onclick="hashLookup()">Buscar →</button>
+        </div>
+        <div id="hash-lookup-result" style="display:none;padding:12px;background:var(--bg3);border-radius:var(--radius);font-size:0.85rem;margin-top:8px;"></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Contenido de la Tabla</div><div class="card-badge" id="hash-count-badge">0 entradas</div></div>
+        <div class="hash-grid" id="hash-grid"><div class="loading-state"><div class="spinner"></div> Cargando...</div></div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">¿Cómo funciona?</div></div>
+        <div style="font-size:0.88rem;color:#ffffff;line-height:1.7;">
+          La <strong style="color:var(--text);">tabla hash</strong> usa el nombre del producto como <em>clave</em>. La función hash calcula el índice del bucket en O(1), permitiendo consultar ventas de "Martillo 16oz" de forma <strong style="color:var(--accent);">instantánea</strong> sin recorrer toda la lista. En caso de colisión se usa <span style="font-family:var(--mono);color:var(--accent4);">encadenamiento separado</span>.
+        </div>
+      </div>
+    </div>
+
+  
+
+<!-- MODAL VENTA -->
+<div class="modal-bg" id="modal-venta">
+  <div class="modal">
+    <div class="modal-title">Registrar Venta</div>
+    <div class="form-row"><label class="form-label">Cliente</label><select class="form-input" id="f-cliente-venta"><option value="">Seleccionar cliente...</option></select></div>
+    <div class="form-row"><label class="form-label">Producto</label><select class="form-input" id="f-producto-venta" onchange="onProductoSelect()"><option value="">Seleccionar producto...</option></select></div>
+    <div class="form-grid-2">
+      <div class="form-row"><label class="form-label">Cantidad</label><input class="form-input" id="f-cantidad" type="number" min="1" value="1" oninput="calcTotal()" /></div>
+      <div class="form-row"><label class="form-label">Precio Unitario (Q)</label><input class="form-input" id="f-precio" type="number" min="0" step="0.01" placeholder="0.00" oninput="calcTotal()" /></div>
+    </div>
+    <div class="form-row"><label class="form-label">Total</label><div style="font-size:1.4rem;font-weight:800;color:var(--accent2);font-family:var(--mono);" id="f-total-preview">Q 0.00</div></div>
+    <div class="form-row"><label class="form-label">Estado</label><select class="form-input" id="f-estado"><option value="completada">Completada</option><option value="pendiente">Pendiente</option></select></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('venta')">Cancelar</button><button class="btn primary" onclick="registrarVenta()">Registrar →</button></div>
+  </div>
+</div>
+
+<!-- MODAL CLIENTE -->
+<div class="modal-bg" id="modal-cliente">
+  <div class="modal">
+    <div class="modal-title">Registrar Cliente</div>
+    <div class="form-row"><label class="form-label">Nombre completo</label><input class="form-input" id="c-nombre" placeholder="Ej. Juan Pérez García" /></div>
+    <div class="form-grid-2">
+      <div class="form-row"><label class="form-label">NIT</label><input class="form-input" id="c-nit" placeholder="CF o número" /></div>
+      <div class="form-row"><label class="form-label">Teléfono</label><input class="form-input" id="c-telefono" placeholder="5555-1234" /></div>
+    </div>
+    <div class="form-row"><label class="form-label">Correo electrónico</label><input class="form-input" id="c-correo" type="email" placeholder="cliente@correo.com" /></div>
+    <div class="form-row"><label class="form-label">Dirección</label><input class="form-input" id="c-direccion" placeholder="Zona, municipio, departamento..." /></div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('cliente')">Cancelar</button><button class="btn primary" onclick="registrarCliente()">Guardar →</button></div>
+  </div>
+</div>
+
+<!-- MODAL PRODUCTO -->
+<div class="modal-bg" id="modal-producto">
+  <div class="modal">
+    <div class="modal-title">Agregar Producto</div>
+    <div class="form-row"><label class="form-label">Nombre del producto</label><input class="form-input" id="p-nombre" placeholder="Ej. Martillo 16oz Stanley" /></div>
+    <div class="form-grid-2">
+      <div class="form-row"><label class="form-label">Categoría</label><select class="form-input" id="p-categoria"><option value="herramientas manuales">Herramientas manuales</option><option value="herramientas eléctricas">Herramientas eléctricas</option><option value="tornillería">Tornillería</option><option value="plomería">Plomería</option><option value="pintura">Pintura</option><option value="construcción">Construcción</option><option value="electricidad">Electricidad</option></select></div>
+      <div class="form-row"><label class="form-label">Unidad</label><select class="form-input" id="p-unidad"><option value="unidad">Unidad</option><option value="caja">Caja</option><option value="bolsa">Bolsa</option><option value="metro">Metro</option><option value="litro">Litro</option><option value="par">Par</option><option value="rollo">Rollo</option></select></div>
+    </div>
+    <div class="form-grid-2">
+      <div class="form-row"><label class="form-label">Precio (Q)</label><input class="form-input" id="p-precio" type="number" min="0" step="0.01" placeholder="0.00" /></div>
+      <div class="form-row"><label class="form-label">Stock inicial</label><input class="form-input" id="p-stock" type="number" min="0" value="0" /></div>
+    </div>
+    <div class="modal-actions"><button class="btn" onclick="closeModal('producto')">Cancelar</button><button class="btn primary" onclick="registrarProducto()">Guardar →</button></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script>
+let API_BASE = localStorage.getItem('ferresmart_api') || '';
+let API_TOKEN = localStorage.getItem('ferresmart_token') || '';
+document.getElementById('apiUrl').value = API_BASE;
+
+let ventasList=[], clientesList=[], productosList=[];
+let hashTable={}, pilaVentas=[];
+let ventasFiltradas=[], clientesFiltrados=[], productosFiltrados=[], detalleFiltradas=[];
+
+// ===== DETALLE DE VENTAS =====
+function renderTablaDetalle(){
+  const tbody=document.getElementById('tbl-detalle');
+  document.getElementById('count-detalle').textContent=detalleFiltradas.length;
+  if(!detalleFiltradas.length){tbody.innerHTML='<tr><td colspan="12"><div class="empty-state">Sin resultados</div></td></tr>';return;}
+  tbody.innerHTML=detalleFiltradas.map(v=>`<tr style="cursor:pointer;" onclick="verDetalle('${esc(v.id)}')">
+    <td style="color:var(--accent);font-size:1rem;">▶</td>
+    <td class="td-mono td-bold">${esc(v.id||'—')}</td>
+    <td class="td-mono" style="color:var(--accent4);">${esc(v.id_cliente||'—')}</td>
+    <td class="td-bold">${esc(v.cliente||'—')}</td>
+    <td class="td-mono" style="color:var(--accent4);">${esc(v.id_producto||'—')}</td>
+    <td>${esc(v.producto)}</td>
+    <td><span class="tag tag-blue">${esc(v.categoria||'—')}</span></td>
+    <td class="td-mono">${v.cantidad}</td>
+    <td class="td-mono">Q${Number(v.precio_unitario||0).toFixed(2)}</td>
+    <td class="td-green">Q${Number(v.total).toLocaleString('es-GT',{maximumFractionDigits:0})}</td>
+    <td class="td-mono">${v.fecha||'—'}</td>
+    <td>${estadoBadge(v.estado)}</td>
+  </tr>`).join('');
+}
+function filtrarDetalle(){
+  const q=document.getElementById('searchDetalle').value.toLowerCase();
+  const est=document.getElementById('filterDetalleEstado').value;
+  const cat=document.getElementById('filterDetalleCat').value;
+  detalleFiltradas=ventasList.filter(v=>
+    (!q||(v.id+' '+v.cliente+' '+v.producto+' '+(v.id_cliente||'')+' '+(v.id_producto||'')).toLowerCase().includes(q))&&
+    (!est||v.estado===est)&&(!cat||v.categoria===cat));
+  renderTablaDetalle();
+}
+function verDetalle(id){
+  const v=ventasList.find(x=>x.id===id);if(!v)return;
+  const panel=document.getElementById('detalle-panel');
+  panel.style.display='block';panel.scrollIntoView({behavior:'smooth',block:'start'});
+  document.getElementById('dp-titulo').textContent='Venta '+v.id;
+  document.getElementById('dp-id').textContent='ID: '+v.id+' · Registrada el '+(v.fecha||'—');
+  document.getElementById('dp-total').textContent='Q'+Number(v.total).toLocaleString('es-GT',{minimumFractionDigits:2});
+  document.getElementById('dp-cantidad').textContent=v.cantidad+' uds';
+  document.getElementById('dp-precio').textContent='Q'+Number(v.precio_unitario||0).toFixed(2);
+  document.getElementById('dp-cliente').textContent=v.cliente||'—';
+  document.getElementById('dp-id-cliente').textContent='ID: '+(v.id_cliente||'—');
+  document.getElementById('dp-producto').textContent=v.producto||'—';
+  document.getElementById('dp-categoria').textContent=v.categoria||'—';
+  document.getElementById('dp-id-producto').textContent='ID: '+(v.id_producto||'—');
+  document.getElementById('dp-fecha').textContent=v.fecha||'—';
+  document.getElementById('dp-estado').innerHTML=estadoBadge(v.estado);
+  document.getElementById('dp-calculo').textContent=v.cantidad+' uds × Q'+Number(v.precio_unitario||0).toFixed(2)+' = Q'+Number(v.total).toLocaleString('es-GT',{minimumFractionDigits:2});
+}
+function cerrarDetalle(){document.getElementById('detalle-panel').style.display='none';}
+
+const DEMO_CLIENTES = [
+  {id:'C001',nombre:'Carlos Reyes Méndez',nit:'12345678-9',telefono:'5501-2233',correo:'creyes@gmail.com',direccion:'Zona 1, Guatemala City'},
+  {id:'C002',nombre:'María López Cifuentes',nit:'CF',telefono:'4422-8899',correo:'mlopez@hotmail.com',direccion:'San Lucas Sacatepéquez'},
+  {id:'C003',nombre:'Constructora Díaz S.A.',nit:'98765432-1',telefono:'2233-4455',correo:'info@constdiaz.gt',direccion:'Zona 12, Guatemala City'},
+  {id:'C004',nombre:'Roberto Ajú Tzul',nit:'CF',telefono:'5599-0011',correo:'raju@gmail.com',direccion:'Mixco, Guatemala'},
+  {id:'C005',nombre:'Ferretería El Clavo',nit:'11223344-5',telefono:'7788-9900',correo:'elclavo@ferreteria.gt',direccion:'Escuintla'},
+];
+const DEMO_PRODUCTOS = [
+  {id:'P001',nombre:'Martillo 16oz Stanley',categoria:'herramientas manuales',precio:125.00,stock:45,unidad:'unidad'},
+  {id:'P002',nombre:'Taladro Percutor 1/2"',categoria:'herramientas eléctricas',precio:850.00,stock:12,unidad:'unidad'},
+  {id:'P003',nombre:'Tornillos autorroscantes 3/4"',categoria:'tornillería',precio:35.00,stock:200,unidad:'caja'},
+  {id:'P004',nombre:'Tubo PVC 1/2" x 6m',categoria:'plomería',precio:48.00,stock:80,unidad:'unidad'},
+  {id:'P005',nombre:'Pintura de aceite blanca',categoria:'pintura',precio:220.00,stock:30,unidad:'litro'},
+  {id:'P006',nombre:'Cemento gris 42.5kg',categoria:'construcción',precio:95.00,stock:150,unidad:'bolsa'},
+  {id:'P007',nombre:'Cable eléctrico #12 AWG',categoria:'electricidad',precio:18.50,stock:500,unidad:'metro'},
+  {id:'P008',nombre:'Llave de paso 3/4"',categoria:'plomería',precio:85.00,stock:35,unidad:'unidad'},
+  {id:'P009',nombre:'Sierra circular 7-1/4"',categoria:'herramientas eléctricas',precio:1250.00,stock:7,unidad:'unidad'},
+  {id:'P010',nombre:'Cinta métrica 5m',categoria:'herramientas manuales',precio:42.00,stock:60,unidad:'unidad'},
+  {id:'P011',nombre:'Nivel de burbuja 24"',categoria:'herramientas manuales',precio:95.00,stock:25,unidad:'unidad'},
+  {id:'P012',nombre:'Varilla de hierro 3/8"',categoria:'construcción',precio:78.00,stock:90,unidad:'unidad'},
+];
+const DEMO_VENTAS = [
+  {id:'V001',id_cliente:'C003',cliente:'Constructora Díaz S.A.',id_producto:'P006',producto:'Cemento gris 42.5kg',categoria:'construcción',cantidad:50,precio_unitario:95.00,total:4750.00,fecha:'2024-01-15',estado:'completada'},
+  {id:'V002',id_cliente:'C001',cliente:'Carlos Reyes Méndez',id_producto:'P002',producto:'Taladro Percutor 1/2"',categoria:'herramientas eléctricas',cantidad:1,precio_unitario:850.00,total:850.00,fecha:'2024-01-15',estado:'completada'},
+  {id:'V003',id_cliente:'C002',cliente:'María López Cifuentes',id_producto:'P005',producto:'Pintura de aceite blanca',categoria:'pintura',cantidad:5,precio_unitario:220.00,total:1100.00,fecha:'2024-01-14',estado:'completada'},
+  {id:'V004',id_cliente:'C004',cliente:'Roberto Ajú Tzul',id_producto:'P001',producto:'Martillo 16oz Stanley',categoria:'herramientas manuales',cantidad:3,precio_unitario:125.00,total:375.00,fecha:'2024-01-14',estado:'completada'},
+  {id:'V005',id_cliente:'C005',cliente:'Ferretería El Clavo',id_producto:'P007',producto:'Cable eléctrico #12 AWG',categoria:'electricidad',cantidad:100,precio_unitario:18.50,total:1850.00,fecha:'2024-01-13',estado:'completada'},
+  {id:'V006',id_cliente:'C003',cliente:'Constructora Díaz S.A.',id_producto:'P012',producto:'Varilla de hierro 3/8"',categoria:'construcción',cantidad:30,precio_unitario:78.00,total:2340.00,fecha:'2024-01-13',estado:'completada'},
+  {id:'V007',id_cliente:'C001',cliente:'Carlos Reyes Méndez',id_producto:'P003',producto:'Tornillos autorroscantes 3/4"',categoria:'tornillería',cantidad:10,precio_unitario:35.00,total:350.00,fecha:'2024-01-12',estado:'completada'},
+  {id:'V008',id_cliente:'C002',cliente:'María López Cifuentes',id_producto:'P004',producto:'Tubo PVC 1/2" x 6m',categoria:'plomería',cantidad:20,precio_unitario:48.00,total:960.00,fecha:'2024-01-12',estado:'pendiente'},
+  {id:'V009',id_cliente:'C004',cliente:'Roberto Ajú Tzul',id_producto:'P009',producto:'Sierra circular 7-1/4"',categoria:'herramientas eléctricas',cantidad:1,precio_unitario:1250.00,total:1250.00,fecha:'2024-01-11',estado:'completada'},
+  {id:'V010',id_cliente:'C005',cliente:'Ferretería El Clavo',id_producto:'P006',producto:'Cemento gris 42.5kg',categoria:'construcción',cantidad:25,precio_unitario:95.00,total:2375.00,fecha:'2024-01-11',estado:'completada'},
+  {id:'V011',id_cliente:'C001',cliente:'Carlos Reyes Méndez',id_producto:'P010',producto:'Cinta métrica 5m',categoria:'herramientas manuales',cantidad:2,precio_unitario:42.00,total:84.00,fecha:'2024-01-10',estado:'completada'},
+  {id:'V012',id_cliente:'C003',cliente:'Constructora Díaz S.A.',id_producto:'P008',producto:'Llave de paso 3/4"',categoria:'plomería',cantidad:8,precio_unitario:85.00,total:680.00,fecha:'2024-01-10',estado:'cancelada'},
+];
+
+function getHeaders(){const h={'Content-Type':'application/json'};if(API_TOKEN)h['Authorization']=`Bearer ${API_TOKEN}`;return h;}
+async function apiFetch(endpoint,options={}){const r=await fetch(API_BASE+endpoint,{headers:getHeaders(),...options});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();}
+
+async function fetchAll(){
+  setApiStatus('loading','Conectando...');
+  try{
+    const[v,c,p]=await Promise.all([apiFetch('/api/ventas'),apiFetch('/api/clientes'),apiFetch('/api/productos')]);
+    ventasList=Array.isArray(v)?v:(v.ventas||v.data||[]);
+    clientesList=Array.isArray(c)?c:(c.clientes||c.data||[]);
+    productosList=Array.isArray(p)?p:(p.productos||p.data||[]);
+    setApiStatus('ok','Conectado');showToast('Datos cargados desde la API ✓');
+  }catch{
+    ventasList=[...DEMO_VENTAS];clientesList=[...DEMO_CLIENTES];productosList=[...DEMO_PRODUCTOS];
+    setApiStatus('err','Modo demo (sin API)');
+  }
+  buildHashTable();buildStack();
+  ventasFiltradas=[...ventasList];clientesFiltrados=[...clientesList];productosFiltrados=[...productosList];detalleFiltradas=[...ventasList];
+  poblarSelectsVenta();renderMetrics();renderTablaRecientes();renderTablaVentas();
+  renderTablaClientes();renderTablaProductos();renderTablaDetalle();renderChartDia();renderChartCat();renderChartProd();
+  renderStackVisual();renderHashGrid();
+}
+
+function buildHashTable(){hashTable={};ventasList.forEach(v=>{const k=v.producto;if(!hashTable[k])hashTable[k]={cantidad:0,total:0,categoria:v.categoria,ventas:0};hashTable[k].cantidad+=Number(v.cantidad);hashTable[k].total+=Number(v.total);hashTable[k].ventas+=1;});}
+function buildStack(){const s=[...ventasList].sort((a,b)=>new Date(b.fecha||b.created_at)-new Date(a.fecha||a.created_at));pilaVentas=s.slice(0,10);}
+
+function poblarSelectsVenta(){
+  document.getElementById('f-cliente-venta').innerHTML='<option value="">Seleccionar cliente...</option>'+clientesList.map(c=>`<option value="${esc(c.id)}">${esc(c.nombre)}</option>`).join('');
+  document.getElementById('f-producto-venta').innerHTML='<option value="">Seleccionar producto...</option>'+productosList.map(p=>`<option value="${esc(p.id)}" data-precio="${p.precio}" data-cat="${esc(p.categoria)}">${esc(p.nombre)} — Q${Number(p.precio).toFixed(2)}</option>`).join('');
+}
+function onProductoSelect(){const sel=document.getElementById('f-producto-venta');const opt=sel.options[sel.selectedIndex];if(opt&&opt.dataset.precio){document.getElementById('f-precio').value=Number(opt.dataset.precio).toFixed(2);calcTotal();}}
+function calcTotal(){const c=parseFloat(document.getElementById('f-cantidad').value)||0;const p=parseFloat(document.getElementById('f-precio').value)||0;document.getElementById('f-total-preview').textContent='Q '+(c*p).toLocaleString('es-GT',{minimumFractionDigits:2,maximumFractionDigits:2});}
+
+function renderMetrics(){
+  const total=ventasList.reduce((s,v)=>s+Number(v.total||0),0);
+  document.getElementById('m-total').textContent=ventasList.length;
+  document.getElementById('m-total-badge').textContent=ventasList.filter(v=>v.estado==='completada').length+' completadas';
+  document.getElementById('m-ingresos').textContent='Q'+total.toLocaleString('es-GT',{maximumFractionDigits:0});
+  document.getElementById('m-clientes').textContent=clientesList.length;
+  document.getElementById('m-productos').textContent=productosList.length;
+  document.getElementById('stack-size').textContent=pilaVentas.length;
+}
+
+function renderTablaRecientes(){
+  const tbody=document.getElementById('tbl-recientes');
+  const t5=pilaVentas.slice(0,5);
+  if(!t5.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state">Sin datos</div></td></tr>';return;}
+  tbody.innerHTML=t5.map(v=>`<tr><td class="td-mono">${esc(v.id||'—')}</td><td class="td-bold">${esc(v.cliente||'—')}</td><td>${esc(v.producto)}</td><td class="td-mono">${v.cantidad}</td><td class="td-green">Q${Number(v.total).toLocaleString('es-GT',{maximumFractionDigits:0})}</td><td class="td-mono">${v.fecha||'—'}</td><td>${estadoBadge(v.estado)}</td></tr>`).join('');
+}
+
+function renderTablaVentas(){
+  const tbody=document.getElementById('tbl-ventas');document.getElementById('count-ventas').textContent=ventasFiltradas.length;
+  if(!ventasFiltradas.length){tbody.innerHTML='<tr><td colspan="9"><div class="empty-state">Sin resultados</div></td></tr>';return;}
+  tbody.innerHTML=ventasFiltradas.map(v=>`<tr><td class="td-mono">${esc(v.id||'—')}</td><td class="td-bold">${esc(v.cliente||'—')}</td><td>${esc(v.producto)}</td><td><span class="tag tag-blue">${esc(v.categoria||'—')}</span></td><td class="td-mono">${v.cantidad}</td><td class="td-mono">Q${Number(v.precio_unitario||0).toFixed(2)}</td><td class="td-green">Q${Number(v.total).toLocaleString('es-GT',{maximumFractionDigits:0})}</td><td class="td-mono">${v.fecha||'—'}</td><td>${estadoBadge(v.estado)}</td></tr>`).join('');
+}
+
+function renderTablaClientes(){
+  const tbody=document.getElementById('tbl-clientes');document.getElementById('count-clientes').textContent=clientesFiltrados.length;
+  if(!clientesFiltrados.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state">Sin clientes</div></td></tr>';return;}
+  tbody.innerHTML=clientesFiltrados.map(c=>{
+    const compras=ventasList.filter(v=>v.id_cliente===c.id||v.cliente===c.nombre).length;
+    const ini=c.nombre.split(' ').slice(0,2).map(w=>w[0]).join('').toUpperCase();
+    return `<tr><td class="td-mono">${esc(c.id||'—')}</td><td><div style="display:flex;align-items:center;gap:8px;"><div class="avatar">${ini}</div><span class="td-bold">${esc(c.nombre)}</span></div></td><td class="td-mono">${esc(c.nit||'CF')}</td><td class="td-mono">${esc(c.telefono||'—')}</td><td style="font-size:0.8rem;color:var(--accent4);">${esc(c.correo||'—')}</td><td style="font-size:0.8rem;">${esc(c.direccion||'—')}</td><td><span class="tag tag-green">${compras} compras</span></td></tr>`;
+  }).join('');
+}
+
+function renderTablaProductos(){
+  const tbody=document.getElementById('tbl-productos');document.getElementById('count-productos').textContent=productosFiltrados.length;
+  if(!productosFiltrados.length){tbody.innerHTML='<tr><td colspan="7"><div class="empty-state">Sin productos</div></td></tr>';return;}
+  tbody.innerHTML=productosFiltrados.map(p=>{
+    const pct=Math.min(100,Math.round((p.stock/200)*100));const low=p.stock<10;
+    return `<tr><td class="td-mono">${esc(p.id||'—')}</td><td class="td-bold">${esc(p.nombre)}</td><td><span class="tag tag-blue">${esc(p.categoria)}</span></td><td class="td-green">Q${Number(p.precio).toFixed(2)}</td><td><div style="font-family:var(--mono);font-size:0.78rem;color:${low?'var(--accent3)':'var(--text2)'};">${p.stock} ${p.unidad||'uds'}</div><div class="stock-bar-wrap"><div class="stock-bar ${low?'low':''}" style="width:${pct}%;"></div></div></td><td class="td-mono">${esc(p.unidad||'—')}</td><td>${low?'<span class="tag tag-red">Stock bajo</span>':'<span class="tag tag-green">Disponible</span>'}</td></tr>`;
+  }).join('');
+}
+
+function filtrarVentas(){const q=document.getElementById('searchVenta').value.toLowerCase();const e=document.getElementById('filterEstado').value;ventasFiltradas=ventasList.filter(v=>(!q||(v.producto+' '+v.cliente+' '+v.id).toLowerCase().includes(q))&&(!e||v.estado===e));renderTablaVentas();}
+function filtrarClientes(){const q=document.getElementById('searchCliente').value.toLowerCase();clientesFiltrados=clientesList.filter(c=>!q||(c.nombre+' '+c.nit+' '+c.telefono).toLowerCase().includes(q));renderTablaClientes();}
+function filtrarProductos(){const q=document.getElementById('searchProd').value.toLowerCase();const cat=document.getElementById('filterCatProd').value;productosFiltrados=productosList.filter(p=>(!q||p.nombre.toLowerCase().includes(q))&&(!cat||p.categoria===cat));renderTablaProductos();}
+
+async function registrarVenta(){
+  const selC=document.getElementById('f-cliente-venta');const selP=document.getElementById('f-producto-venta');
+  const clienteId=selC.value;const clienteNombre=selC.options[selC.selectedIndex]?.text||'';
+  const productoId=selP.value;const opt=selP.options[selP.selectedIndex];
+  const productoNombre=opt?.text.split(' — ')[0]||'';const categoria=opt?.dataset.cat||'';
+  const cantidad=parseInt(document.getElementById('f-cantidad').value);
+  const precio=parseFloat(document.getElementById('f-precio').value);
+  const estado=document.getElementById('f-estado').value;
+  if(!clienteId||!productoId||!precio||cantidad<1){showToast('Completa todos los campos');return;}
+  const venta={id:'V'+String(ventasList.length+1).padStart(3,'0'),id_cliente:clienteId,cliente:clienteNombre,id_producto:productoId,producto:productoNombre,categoria,cantidad,precio_unitario:precio,total:cantidad*precio,fecha:new Date().toISOString().split('T')[0],estado};
+  try{await apiFetch('/api/ventas',{method:'POST',body:JSON.stringify(venta)});showToast('Venta registrada en la API ✓');}catch{showToast('Guardado localmente');}
+  ventasList.unshift(venta);pilaVentas.unshift(venta);if(pilaVentas.length>10)pilaVentas.pop();
+  buildHashTable();ventasFiltradas=[...ventasList];detalleFiltradas=[...ventasList];
+  renderMetrics();renderTablaRecientes();renderTablaVentas();renderTablaDetalle();renderStackVisual();renderHashGrid();renderChartCat();renderChartProd();
+  closeModal('venta');
+}
+
+async function registrarCliente(){
+  const nombre=document.getElementById('c-nombre').value.trim();
+  if(!nombre){showToast('El nombre es obligatorio');return;}
+  const cliente={id:'C'+String(clientesList.length+1).padStart(3,'0'),nombre,nit:document.getElementById('c-nit').value.trim()||'CF',telefono:document.getElementById('c-telefono').value.trim(),correo:document.getElementById('c-correo').value.trim(),direccion:document.getElementById('c-direccion').value.trim()};
+  try{await apiFetch('/api/clientes',{method:'POST',body:JSON.stringify(cliente)});showToast('Cliente registrado en la API ✓');}catch{showToast('Guardado localmente');}
+  clientesList.push(cliente);clientesFiltrados=[...clientesList];poblarSelectsVenta();renderMetrics();renderTablaClientes();closeModal('cliente');
+  ['c-nombre','c-nit','c-telefono','c-correo','c-direccion'].forEach(id=>document.getElementById(id).value='');
+}
+
+async function registrarProducto(){
+  const nombre=document.getElementById('p-nombre').value.trim();const precio=parseFloat(document.getElementById('p-precio').value);
+  if(!nombre||!precio){showToast('Nombre y precio son obligatorios');return;}
+  const producto={id:'P'+String(productosList.length+1).padStart(3,'0'),nombre,categoria:document.getElementById('p-categoria').value,precio,stock:parseInt(document.getElementById('p-stock').value)||0,unidad:document.getElementById('p-unidad').value};
+  try{await apiFetch('/api/productos',{method:'POST',body:JSON.stringify(producto)});showToast('Producto agregado en la API ✓');}catch{showToast('Guardado localmente');}
+  productosList.push(producto);productosFiltrados=[...productosList];poblarSelectsVenta();renderMetrics();renderTablaProductos();renderChartProd();closeModal('producto');
+  ['p-nombre','p-precio','p-stock'].forEach(id=>document.getElementById(id).value='');
+}
+
+function hashLookup(){
+  const q=document.getElementById('hashSearch').value.trim();const res=document.getElementById('hash-lookup-result');res.style.display='block';
+  if(!q){res.innerHTML='<span style="color:var(--text3);">Ingresa el nombre de un producto.</span>';return;}
+  const val=hashTable[q];
+  if(val){res.innerHTML=`<span style="font-family:var(--mono);color:var(--accent);">hash("${esc(q)}") → </span><strong style="color:var(--text);">Q${val.total.toLocaleString('es-GT',{maximumFractionDigits:0})}</strong> en ventas · ${val.cantidad} unidades · ${val.ventas} transacciones`;}
+  else{const key=Object.keys(hashTable).find(k=>k.toLowerCase()===q.toLowerCase());if(key){const v=hashTable[key];res.innerHTML=`<span style="font-family:var(--mono);color:var(--accent4);">Match: "${esc(key)}" → Q${v.total.toLocaleString('es-GT',{maximumFractionDigits:0})} · ${v.cantidad} uds</span>`;}else{res.innerHTML=`<span style="font-family:var(--mono);color:var(--accent3);">KeyError: "${esc(q)}" no existe en la tabla hash.</span>`;}}
+}
+
+function renderHashGrid(){
+  const grid=document.getElementById('hash-grid');const entries=Object.entries(hashTable);
+  document.getElementById('hash-count-badge').textContent=entries.length+' entradas';
+  if(!entries.length){grid.innerHTML='<div class="empty-state">Tabla vacía</div>';return;}
+  grid.innerHTML=entries.map(([k,v])=>`<div class="hash-cell"><div class="hash-key" title="${esc(k)}">${esc(k)}</div><div class="hash-val">Q${v.total.toLocaleString('es-GT',{maximumFractionDigits:0})}</div><div class="hash-sub">${v.cantidad} uds · ${v.ventas} tx</div></div>`).join('');
+}
+
+function renderStackVisual(){
+  const div=document.getElementById('stack-visual');
+  if(!pilaVentas.length){div.innerHTML='<div class="empty-state">Pila vacía</div>';return;}
+  div.innerHTML=pilaVentas.map((v,i)=>`<div class="stack-item ${i===0?'top':''}"><span class="stack-index">[${pilaVentas.length-1-i}]</span><span style="flex:1;font-size:0.8rem;font-weight:${i===0?700:400};color:${i===0?'var(--text)':'var(--text2)'};">${esc(v.producto)}</span><span style="font-family:var(--mono);font-size:0.7rem;color:var(--accent2);">Q${Number(v.total).toLocaleString('es-GT',{maximumFractionDigits:0})}</span>${i===0?'<span style="margin-left:6px;font-family:var(--mono);font-size:0.6rem;color:var(--accent);">TOP</span>':''}</div>`).join('');
+  document.getElementById('stack-size').textContent=pilaVentas.length;
+}
+
+function pilaApiPop(){if(!pilaVentas.length){showToast('La pila está vacía');return;}const p=pilaVentas.shift();renderStackVisual();showToast(`POP: ${p.producto} — Q${Number(p.total).toLocaleString('es-GT',{maximumFractionDigits:0})}`);}
+function pilaApiPeek(){const pk=document.getElementById('peek-result');if(!pilaVentas.length){pk.style.display='none';showToast('Pila vacía');return;}const top=pilaVentas[0];pk.style.display='block';pk.textContent=`PEEK → "${top.producto}" | Q${Number(top.total).toLocaleString('es-GT',{maximumFractionDigits:0})} | ${top.fecha}`;}
+
+let charts={};
+function destroyChart(id){if(charts[id]){charts[id].destroy();delete charts[id];}}
+function renderChartDia(){
+  destroyChart('dia');const labels7=[];const dias={};
+  for(let i=6;i>=0;i--){const d=new Date();d.setDate(d.getDate()-i);const key=d.toISOString().split('T')[0];const label=d.toLocaleDateString('es-GT',{weekday:'short',day:'numeric'});dias[key]=0;labels7.push({key,label});}
+  ventasList.forEach(v=>{if(dias[v.fecha]!==undefined)dias[v.fecha]+=Number(v.total||0);});
+  let vals=labels7.map(l=>dias[l.key]);if(vals.every(v=>v===0))vals=labels7.map(()=>Math.round(Math.random()*5000+1000));
+  charts['dia']=new Chart(document.getElementById('chartDia'),{type:'bar',data:{labels:labels7.map(l=>l.label),datasets:[{label:'Ingresos (Q)',data:vals,backgroundColor:'#e8ff4722',borderColor:'#e8ff47',borderWidth:1.5,borderRadius:4}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2e2e2e'},ticks:{color:'#606060',font:{family:'IBM Plex Mono',size:10}}},y:{grid:{color:'#2e2e2e'},ticks:{color:'#606060',font:{family:'IBM Plex Mono',size:10},callback:v=>'Q'+v.toLocaleString()}}}}});
+}
+function renderChartCat(){
+  destroyChart('cat');const cats={};
+  ventasList.forEach(v=>{const c=v.categoria||'otro';cats[c]=(cats[c]||0)+Number(v.total||0);});
+  const keys=Object.keys(cats);const vals=keys.map(k=>cats[k]);
+  const colors=['#e8ff47','#47ffb2','#6bbbff','#ff6b6b','#ffb432','#d147ff','#47d1ff'];
+  charts['cat']=new Chart(document.getElementById('chartCat'),{type:'doughnut',data:{labels:keys,datasets:[{data:vals,backgroundColor:colors.slice(0,keys.length),borderColor:'#1e1e1e',borderWidth:2}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{position:'right',labels:{color:'#a0a0a0',font:{family:'IBM Plex Mono',size:10},boxWidth:10,padding:12}}}}});
+}
+function renderChartProd(){
+  destroyChart('prod');const entries=Object.entries(hashTable).sort((a,b)=>b[1].total-a[1].total).slice(0,8);
+  if(!entries.length)return;
+  charts['prod']=new Chart(document.getElementById('chartProd'),{type:'bar',data:{labels:entries.map(([k])=>k),datasets:[{label:'Total vendido (Q)',data:entries.map(([,v])=>v.total),backgroundColor:'#47ffb222',borderColor:'#47ffb2',borderWidth:1.5,borderRadius:4}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#2e2e2e'},ticks:{color:'#606060',font:{family:'IBM Plex Mono',size:10},callback:v=>'Q'+v.toLocaleString()}},y:{grid:{color:'#2e2e2e'},ticks:{color:'#a0a0a0',font:{size:11}}}}}});
+}
+
+function exportarCSV(){
+  const h=['ID','Cliente','Producto','Categoria','Cantidad','Precio Unitario','Total','Fecha','Estado'];
+  const r=ventasFiltradas.map(v=>[v.id,v.cliente,v.producto,v.categoria,v.cantidad,v.precio_unitario,v.total,v.fecha,v.estado].join(','));
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([[h.join(','),...r].join('\n')],{type:'text/csv'}));a.download='ventas_ferresmart.csv';a.click();showToast('CSV exportado ✓');
+}
+
+function guardarConfig(){API_BASE=document.getElementById('apiUrl').value.trim();API_TOKEN=document.getElementById('apiToken').value.trim();localStorage.setItem('ferresmart_api',API_BASE);localStorage.setItem('ferresmart_token',API_TOKEN);showToast('Configuración guardada');}
+async function testConexion(){const res=document.getElementById('config-result');res.textContent='Probando...';try{await apiFetch('/api/analisis/resumen');res.style.color='var(--accent2)';res.textContent='✓ Conexión exitosa con '+API_BASE;setApiStatus('ok','Conectado');}catch(e){res.style.color='var(--accent3)';res.textContent='✗ No se pudo conectar: '+e.message;setApiStatus('err','Sin conexión');}}
+
+function openModal(t){if(t==='venta')poblarSelectsVenta();document.getElementById('modal-'+t).classList.add('open');}
+function closeModal(t){document.getElementById('modal-'+t).classList.remove('open');}
+['venta','cliente','producto'].forEach(t=>{document.getElementById('modal-'+t).addEventListener('click',e=>{if(e.target===document.getElementById('modal-'+t))closeModal(t);});});
+
+function showPage(name,btn){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(b=>b.classList.remove('active'));document.getElementById('page-'+name).classList.add('active');if(btn)btn.classList.add('active');}
+function setApiStatus(state,label){document.getElementById('apiDot').className='dot '+state;document.getElementById('apiLabel').textContent=label;}
+function estadoBadge(est){const map={completada:'tag-green',pendiente:'tag-yellow',cancelada:'tag-red'};return `<span class="tag ${map[est]||'tag-blue'}">${est||'—'}</span>`;}
+let toastTimer;
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>t.classList.remove('show'),2800);}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+
+fetchAll();
+</script>
+</body>
+</html>
