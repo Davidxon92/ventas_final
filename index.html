@@ -404,8 +404,11 @@
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script>
-let API_BASE = localStorage.getItem('ferresmart_api') || '';
-let API_TOKEN = localStorage.getItem('ferresmart_token') || '';
+// En producción (Railway) siempre usamos URLs relativas al mismo dominio.
+// Solo en localhost leemos localStorage para poder apuntar a un backend local.
+const _isLocalhost = ['localhost','127.0.0.1'].includes(window.location.hostname);
+let API_BASE  = _isLocalhost ? (localStorage.getItem('ferresmart_api')   || '') : '';
+let API_TOKEN = _isLocalhost ? (localStorage.getItem('ferresmart_token') || '') : '';
 document.getElementById('apiUrl').value = API_BASE;
 
 let ventasList=[], clientesList=[], productosList=[];
