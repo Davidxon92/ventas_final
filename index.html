@@ -501,9 +501,22 @@ const DEMO_VENTAS = [
 ];
 
 function getHeaders(){const h={'Content-Type':'application/json'};if(API_TOKEN)h['Authorization']=`Bearer ${API_TOKEN}`;return h;}
-async function apiFetch(endpoint,options={}){const r=await fetch(API_BASE+endpoint,{headers:getHeaders(),...options});if(!r.ok)throw new Error(`HTTP ${r.status}`);return r.json();}
+async function apiFetch(endpoint,options={}){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),10000);
+  try{
+    const r=await fetch(API_BASE+endpoint,{headers:getHeaders(),signal:controller.signal,...options});
+    clearTimeout(timer);
+    if(!r.ok)throw new Error(`HTTP ${r.status}`);
+    return r.json();
+  }catch(e){
+    clearTimeout(timer);
+    throw e;
+  }
+}
 
 async function fetchAll(){
+  console.log('[FerreSmart] fetchAll iniciado, API_BASE=', API_BASE, 'hostname=', window.location.hostname);
   setApiStatus('loading','Conectando...');
   try{
     const[v,c,p]=await Promise.all([apiFetch('/api/ventas'),apiFetch('/api/clientes'),apiFetch('/api/productos')]);
@@ -511,7 +524,8 @@ async function fetchAll(){
     clientesList=Array.isArray(c)?c:(c.clientes||c.data||[]);
     productosList=Array.isArray(p)?p:(p.productos||p.data||[]);
     setApiStatus('ok','Conectado');showToast('Datos cargados desde la API ✓');
-  }catch{
+  }catch(err){
+    console.error('[FerreSmart] Error de API:', err);
     ventasList=[...DEMO_VENTAS];clientesList=[...DEMO_CLIENTES];productosList=[...DEMO_PRODUCTOS];
     setApiStatus('err','Modo demo (sin API)');
   }
